@@ -1,6 +1,7 @@
 /**
  * flagsmith-client.js
- * Wraps the Flagsmith SDK initialization and experiment helpers.
+ * Wraps the Flagsmith SDK (@flagsmith/flagsmith v12.6.0+) initialization
+ * and experiment helpers.
  *
  * Experiment flag: festive_theme_experiment
  *   - control  → normal theme
@@ -9,17 +10,8 @@
  * Boolean flag: festive_mode_enabled
  *   - true  → festive mode on
  *   - false → festive mode off
- *
- * The client-side environment key is loaded from VITE_FLAGSMITH_ENVIRONMENT_KEY
- * (defined in .env — never committed to source control).
- *
- * When the env key is absent (e.g. during local dev without .env), Flagsmith
- * initialization is skipped and the app falls back to default values, so the
- * UI still works without any configuration.
  */
 
-// Guard: in environments without a bundler (e.g., simulate.js runs in Node
-// and imports its own SDK separately), this module is used only in the browser.
 let flagsmith = null;
 
 /** Stable user id — generated once and persisted in localStorage */
@@ -37,7 +29,7 @@ export function getUserId() {
 let sdkReady = false;
 
 /**
- * Initialises the Flagsmith SDK.
+ * Initialises the Flagsmith SDK with events enabled.
  * Returns true if init succeeded, false if the env key is missing or init fails.
  */
 export async function initFlagsmith() {
@@ -50,17 +42,13 @@ export async function initFlagsmith() {
   }
 
   try {
-    // Dynamic import keeps the bundle clean; Vite tree-shakes unused SDK code.
     const mod = await import("@flagsmith/flagsmith");
     flagsmith = mod.default ?? mod;
 
     await flagsmith.init({
       environmentID: envKey,
-      // enableAnalytics must be true to send experiment events
-      enableAnalytics: true,
-      // Identify the user so exposures and conversions are joined by identity
+      enableEvents: true,
       identity: getUserId(),
-      // Default flag values — used as fallback when Flagsmith is unreachable
       defaultFlags: {
         festive_mode_enabled: { enabled: true, value: null },
         festive_theme_experiment: { enabled: true, value: "control" },
@@ -78,55 +66,48 @@ export async function initFlagsmith() {
 
 /** Returns true if festive_mode_enabled flag is on */
 export function getFestiveMode() {
-  if (!sdkReady || !flagsmith) return true; // default ON
+  if (!sdkReady || !flagsmith) return true;
   return flagsmith.hasFeature("festive_mode_enabled");
 }
 
 /**
  * Returns the experiment variation: "control" | "festive"
- * This call records an exposure in Flagsmith Experimentation.
+ * Uses getExperimentFlag() so Flagsmith records a $flag_exposure event
+ * for the identified user.
  */
 export function getExperimentVariation() {
   if (!sdkReady || !flagsmith) return "control";
-  // getValue on a multivariate flag returns the winning variation's value
-  // and records an exposure for this identity automatically.
-  const val = flagsmith.getValue("festive_theme_experiment");
-  return val ?? "control";
+  const flag = flagsmith.getExperimentFlag("festive_theme_experiment");
+  return String(flag?.value ?? "control");
 }
 
 /**
  * Tracks the add_to_cart_click conversion event.
- * The event name MUST match the metric definition in Flagsmith exactly.
+ * Event name is case-sensitive and matches the Flagsmith metric exactly.
  */
-export async function trackAddToCart() {
+export function trackAddToCart() {
   if (!sdkReady || !flagsmith) return;
   try {
-    await flagsmith.track("add_to_cart_click");
-    console.debug("[FestiveCart] Tracked: add_to_cart_click");
+    flagsmith.trackEvent("add_to_cart_click");
   } catch (err) {
-    console.warn("[FestiveCart] Track event failed:", err.message);
+    console.warn("[FestiveCart] trackEvent failed:", err.message);
   }
 }
 
 /**
  * Flushes any buffered analytics events before the page unloads.
- * Call on 'beforeunload' or 'visibilitychange' (hidden).
  */
 export async function flushEvents() {
   if (!sdkReady || !flagsmith) return;
   try {
-    if (typeof flagsmith.flushEvents === "function") {
-      await flagsmith.flushEvents();
-    }
+    await flagsmith.flushEvents();
   } catch (_) {
     // Best-effort on unload
   }
 }
 
-/** Returns the raw flagsmith instance (for admin panel introspection) */
 export function getFlagsmithInstance() {
   return flagsmith;
 }
 
 export { sdkReady };
-

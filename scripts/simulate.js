@@ -2,137 +2,109 @@
  * scripts/simulate.js
  * FestiveCart — Traffic Simulator
  *
- * Simulates ~300 users visiting the shop during the Christmas festival.
- * Each user gets their own unique id, sees the experiment flag, and
- * some of them (more in the festive group) trigger add_to_cart_click.
+ * Simulates 300 users visiting the shop during the Christmas festival range
+ * (2026-12-22). Each user gets a unique identifier, evaluates
+ * `festive_theme_experiment` via getExperimentFlag() (recording exposure),
+ * and some trigger `add_to_cart_click` (higher CTR for `festive`).
  *
  * Usage:
  *   node scripts/simulate.js
- *
- * Requirements:
- *   - Set FLAGSMITH_SERVER_SIDE_KEY in .env or as an env var.
- *   - npm install flagsmith-nodejs (server-side SDK; different from browser SDK).
- *
- * After the script exits, wait ~1 minute then run:
- *   node scripts/check-results.js
  */
 
-import { createRequire } from "module";
-import { config } from "dotenv";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createFlagsmithInstance } from "@flagsmith/flagsmith";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-config({ path: path.join(__dirname, "../.env") });
+const envPath = path.join(__dirname, "../.env");
 
-// ─── Validate env ──────────────────────────────────────────────────────────
-const SERVER_KEY = process.env.FLAGSMITH_SERVER_SIDE_KEY;
-const ENV_KEY    = process.env.VITE_FLAGSMITH_ENVIRONMENT_KEY;
-const EXPERIMENT_ID = process.env.FLAGSMITH_EXPERIMENT_ID ?? "";
-const ENV_API_KEY   = process.env.FLAGSMITH_ENV_KEY ?? "";  // environment key (not client key)
+// Load .env without external dependencies
+if (fs.existsSync(envPath)) {
+  const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const val = trimmed.slice(eq + 1).trim();
+    if (key && !(key in process.env)) {
+      process.env[key] = val;
+    }
+  }
+}
 
-if (!SERVER_KEY && !ENV_KEY) {
-  console.error(
-    "\n❌ No Flagsmith key found.\n" +
-    "   Set FLAGSMITH_SERVER_SIDE_KEY in .env to use the Node.js server SDK,\n" +
-    "   or VITE_FLAGSMITH_ENVIRONMENT_KEY to use the browser SDK in Node.\n"
-  );
+const ENV_KEY = process.env.VITE_FLAGSMITH_ENVIRONMENT_KEY || process.env.FLAGSMITH_ENV_KEY;
+if (!ENV_KEY || ENV_KEY === "your_client_side_environment_key_here") {
+  console.error("❌ VITE_FLAGSMITH_ENVIRONMENT_KEY not set in .env");
   process.exit(1);
 }
 
-// ─── Flagsmith SDK (browser-compatible, works in Node 18+) ───────────────
-// We use the same @flagsmith/flagsmith package as the browser — it works
-// in Node.js 18+ natively and supports event tracking.
-let Flagsmith;
-try {
-  const mod = await import("@flagsmith/flagsmith");
-  Flagsmith = mod.default ?? mod;
-} catch (e) {
-  console.error("❌ Could not import @flagsmith/flagsmith:", e.message);
-  console.error("   Run: npm install");
-  process.exit(1);
-}
+const TOTAL_USERS    = 300;
+const BATCH_SIZE     = 15;
+const FESTIVE_CTR    = 0.45;
+const CONTROL_CTR    = 0.25;
+const FLAG_KEY       = "festive_theme_experiment";
+const EVENT_NAME     = "add_to_cart_click";
+const SIMULATED_DATE = "2026-12-22"; // Christmas range
 
-// ─── Config ────────────────────────────────────────────────────────────────
-const TOTAL_USERS      = 300;
-const FESTIVE_CTR      = 0.45;  // 45% of festive-group users click Add to Cart
-const CONTROL_CTR      = 0.25;  // 25% of control-group users click Add to Cart
-const FLAG_KEY         = "festive_theme_experiment";
-const EVENT_NAME       = "add_to_cart_click";   // must match metric exactly (case-sensitive)
+const exposed   = { control: 0, festive: 0 };
+const converted = { control: 0, festive: 0 };
+let errors = 0;
 
-// Fix the simulated date to Christmas range so the experiment is active
-// (simulate.js uses server-side evaluation — the date simulation is cosmetic here;
-//  the actual variation is determined by Flagsmith's rollout config)
-const SIMULATED_DATE   = "2026-12-22";
-
-// ─── Helper: generate a unique user id ────────────────────────────────────
 function makeUserId(i) {
-  return `sim_user_${SIMULATED_DATE}_${String(i).padStart(4, "0")}`;
+  return `sim_${SIMULATED_DATE}_${Date.now()}_${String(i).padStart(4, "0")}`;
 }
 
-// ─── Counters ──────────────────────────────────────────────────────────────
-let exposed    = { control: 0, festive: 0 };
-let converted  = { control: 0, festive: 0 };
-let errors     = 0;
-
-// ─── Main simulation ───────────────────────────────────────────────────────
-console.log(`\n🎄 FestiveCart Traffic Simulator`);
-console.log(`   Simulating ${TOTAL_USERS} users on ${SIMULATED_DATE} (Christmas)\n`);
-
-for (let i = 0; i < TOTAL_USERS; i++) {
+async function simulateUser(i) {
   const userId = makeUserId(i);
-
+  const client = createFlagsmithInstance();
   try {
-    // Each user gets their own Flagsmith client instance so identities are isolated
-    const fs = Object.create(Flagsmith);
-
-    await Flagsmith.init({
-      environmentID: ENV_KEY ?? SERVER_KEY,
-      enableAnalytics: true,
+    await client.init({
+      environmentID: ENV_KEY,
+      fetch: globalThis.fetch,
+      enableEvents: true,
       identity: userId,
       defaultFlags: {
+        festive_mode_enabled: { enabled: true, value: null },
         [FLAG_KEY]: { enabled: true, value: "control" },
       },
     });
 
-    // Get variation — this records an EXPOSURE in Flagsmith Experimentation
-    const variation = Flagsmith.getValue(FLAG_KEY) ?? "control";
+    const flag = client.getExperimentFlag(FLAG_KEY);
+    const variation = String(flag?.value ?? "control");
     exposed[variation] = (exposed[variation] ?? 0) + 1;
 
-    // Simulate click probability based on variation
     const ctr = variation === "festive" ? FESTIVE_CTR : CONTROL_CTR;
     if (Math.random() < ctr) {
-      await Flagsmith.track(EVENT_NAME);
+      client.trackEvent(EVENT_NAME);
       converted[variation] = (converted[variation] ?? 0) + 1;
     }
 
-    // Progress indicator
-    if ((i + 1) % 50 === 0) {
-      process.stdout.write(`   ✓ Processed ${i + 1}/${TOTAL_USERS} users\r`);
-    }
+    await client.flushEvents();
+    await client.close(3000);
   } catch (err) {
     errors++;
     if (errors <= 3) {
-      console.error(`\n   ⚠ Error for user ${userId}:`, err.message);
+      console.error(`\n   ⚠ Error for ${userId}:`, err.message);
     }
   }
 }
 
-// ─── Flush remaining buffered events ──────────────────────────────────────
-console.log(`\n\n📤 Flushing remaining buffered events…`);
-try {
-  if (typeof Flagsmith.flushEvents === "function") {
-    await Flagsmith.flushEvents();
-    console.log("   ✓ Events flushed.");
-  } else {
-    console.log("   ℹ flushEvents not available on this SDK version — events sent inline.");
+console.log(`\n🎄 FestiveCart Traffic Simulator`);
+console.log(`   Simulating ${TOTAL_USERS} users on ${SIMULATED_DATE} (Christmas)\n`);
+
+for (let start = 0; start < TOTAL_USERS; start += BATCH_SIZE) {
+  const batch = [];
+  for (let i = start; i < Math.min(start + BATCH_SIZE, TOTAL_USERS); i++) {
+    batch.push(simulateUser(i));
   }
-} catch (e) {
-  console.warn("   ⚠ flushEvents error:", e.message);
+  await Promise.all(batch);
+  process.stdout.write(`   ✓ Processed ${Math.min(start + BATCH_SIZE, TOTAL_USERS)}/${TOTAL_USERS} users\r`);
 }
 
-// ─── Summary ───────────────────────────────────────────────────────────────
-console.log("\n📊 Simulation Summary");
+console.log("\n\n📊 Simulation Summary");
 console.log("─".repeat(45));
 console.log(`Total users simulated : ${TOTAL_USERS}`);
 console.log(`Errors                : ${errors}`);
@@ -147,11 +119,5 @@ for (const group of ["control", "festive"]) {
   console.log(`${group.padEnd(12)} | ${String(exp).padEnd(7)} | ${String(conv).padEnd(9)} | ${ctr}%`);
 }
 
-console.log("\n⏳ Wait about 1 minute, then run:");
-console.log("   node scripts/check-results.js\n");
-
-if (EXPERIMENT_ID && ENV_API_KEY) {
-  console.log("🔗 Experiment dashboard:");
-  console.log(`   https://app.flagsmith.com/project/-/environment/${ENV_API_KEY}/experiments/${EXPERIMENT_ID}\n`);
-}
-
+console.log("\n🔗 Experiment dashboard:");
+console.log("   https://app.flagsmith.com/project/56662/environment/DabqqdUmK9XKUF4GqvhqEi/experiments/707\n");
