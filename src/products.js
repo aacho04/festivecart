@@ -1,0 +1,88 @@
+/**
+ * products.js
+ * Static product catalogue — 8 fake products.
+ * No external images; uses emoji as the product visual.
+ */
+
+export const PRODUCTS = [
+  {
+    id: 1,
+    name: "Wireless Headphones",
+    emoji: "🎧",
+    price: 2499,
+    originalPrice: 3499,
+    category: "Electronics",
+    rating: 4.5,
+    reviews: 1284,
+  },
+  {
+    id: 2,
+    name: "Handcrafted Diyas Set",
+    emoji: "🪔",
+    price: 349,
+    originalPrice: 549,
+    category: "Home Decor",
+    rating: 4.8,
+    reviews: 3621,
+  },
+  {
+    id: 3,
+    name: "Premium Silk Saree",
+    emoji: "🥻",
+    price: 4999,
+    originalPrice: 7999,
+    category: "Fashion",
+    rating: 4.7,
+    reviews: 892,
+  },
+  {
+    id: 4,
+    name: "Organic Dry Fruits Box",
+    emoji: "🥜",
+    price: 899,
+    originalPrice: 1299,
+    category: "Food & Gifts",
+    rating: 4.6,
+    reviews: 2145,
+  },
+  {
+    id: 5,
+    name: "Smart Watch",
+    emoji: "⌚",
+    price: 7999,
+    originalPrice: 11999,
+    category: "Electronics",
+    rating: 4.3,
+    reviews: 567,
+  },
+  {
+    id: 6,
+    name: "Aromatic Incense Set",
+    emoji: "🕯️",
+    price: 249,
+    originalPrice: 399,
+    category: "Home & Wellness",
+    rating: 4.9,
+    reviews: 4201,
+  },
+  {
+    id: 7,
+    name: "Copper Water Bottle",
+    emoji: "🫙",
+    price: 699,
+    originalPrice: 999,
+    category: "Kitchen",
+    rating: 4.6,
+    reviews: 1823,
+  },
+  {
+    id: 8,
+    name: "Designer Gift Hamper",
+    emoji: "🎁",
+    price: 1499,
+    originalPrice: 2199,
+    category: "Gifts",
+    rating: 4.8,
+    reviews: 3045,
+  },
+];

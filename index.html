@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="FestiveCart – Shop that celebrates every festival with you." />
+    <title>FestiveCart 🛒</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- Decoration layer (populated by theme engine) -->
+    <div id="decoration-layer" aria-hidden="true"></div>
+
+    <!-- ===== HEADER ===== -->
+    <header class="site-header" id="site-header">
+      <div class="header-inner container">
+        <a href="/" class="logo" aria-label="FestiveCart home">
+          <span class="logo-icon">🛒</span>
+          <span class="logo-text">FestiveCart</span>
+        </a>
+
+        <!-- Festival banner (hidden when no festival) -->
+        <div class="festival-banner" id="festival-banner" role="status" aria-live="polite"></div>
+
+        <div class="header-actions">
+          <button class="cart-btn" id="cart-btn" aria-label="Cart (0 items)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+            </svg>
+            <span class="cart-count" id="cart-count">0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Light string decoration (Christmas) -->
+      <div class="light-string" id="light-string" aria-hidden="true"></div>
+    </header>
+
+    <!-- ===== HERO ===== -->
+    <section class="hero" id="hero">
+      <div class="container hero-inner">
+        <h1 class="hero-headline" id="hero-headline">Everything you need, delivered with joy.</h1>
+        <p class="hero-sub" id="hero-sub">Free delivery on orders above ₹499. Shop thousands of products.</p>
+        <div class="hero-cta">
+          <button class="btn btn-primary btn-hero" id="shop-now-btn">Shop Now</button>
+          <span class="offer-badge" id="offer-badge" hidden></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== PRODUCTS ===== -->
+    <main class="main container" id="main">
+      <h2 class="section-title">Featured Products</h2>
+      <div class="product-grid" id="product-grid" role="list">
+        <!-- Products rendered by JS -->
+      </div>
+    </main>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <p class="footer-logo">🛒 FestiveCart</p>
+        <p class="footer-tagline">Celebrating every festival with you.</p>
+        <div class="footer-links">
+          <a href="#">About</a>
+          <a href="#">Contact</a>
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+        </div>
+        <p class="footer-copy">© 2026 FestiveCart. All prices in Indian Rupees (₹).</p>
+        <p class="footer-experiment" id="footer-experiment" style="font-size:0.75rem;opacity:0.6;margin-top:0.5rem;"></p>
+      </div>
+    </footer>
+
+    <!-- ===== ADMIN PANEL ===== -->
+    <div id="admin-panel-wrapper">
+      <!-- Toggle button -->
+      <button
+        class="admin-toggle-btn"
+        id="admin-toggle-btn"
+        aria-label="Toggle admin panel (Shift+A)"
+        aria-expanded="false"
+        aria-controls="admin-panel"
+        title="Admin / Demo Panel (Shift+A)"
+      >⚙️</button>
+
+      <!-- Panel -->
+      <aside
+        class="admin-panel"
+        id="admin-panel"
+        aria-label="Admin demo panel"
+        hidden
+      >
+        <div class="admin-panel-header">
+          <span class="admin-badge">🛠 Admin / Demo Tool</span>
+          <button class="admin-close-btn" id="admin-close-btn" aria-label="Close admin panel">✕</button>
+        </div>
+
+        <!-- Festive mode switch -->
+        <div class="admin-row">
+          <label class="admin-label" for="festive-toggle">Festive Mode</label>
+          <div class="toggle-group">
+            <button
+              class="toggle-switch"
+              id="festive-toggle"
+              role="switch"
+              aria-checked="true"
+              aria-label="Festive mode on/off"
+            >
+              <span class="toggle-thumb"></span>
+            </button>
+            <span class="override-label" id="override-label" hidden>Local override</span>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-ghost" id="use-flagsmith-btn" hidden>↩ Use Flagsmith value</button>
+
+        <!-- Festival selector -->
+        <div class="admin-row">
+          <label class="admin-label" for="festival-select">Simulate festival</label>
+          <select class="admin-select" id="festival-select">
+            <option value="">— Real date —</option>
+            <!-- Populated by JS -->
+          </select>
+        </div>
+
+        <!-- Date picker -->
+        <div class="admin-row">
+          <label class="admin-label" for="date-picker">Simulate date</label>
+          <input class="admin-input" type="date" id="date-picker" />
+        </div>
+
+        <button class="btn btn-sm btn-ghost" id="reset-date-btn">📅 Reset to today</button>
+
+        <!-- Status -->
+        <div class="admin-status" id="admin-status" aria-live="polite">
+          <!-- Populated by JS -->
+        </div>
+      </aside>
+    </div>
+
+    <!-- Cart notification toast -->
+    <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
