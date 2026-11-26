@@ -11,6 +11,54 @@
   </head>
   <body>
 
+    <!-- ══════════════ LOGIN PAGE (shown when not authenticated) ══════════════ -->
+    <div id="login-page" class="login-page" hidden>
+      <div class="login-card">
+        <div class="login-brand">
+          <span class="login-brand-icon">🛒</span>
+          <h1>FestiveCart</h1>
+          <p>India's favourite festive shopping destination</p>
+        </div>
+
+        <form id="login-form" class="login-form" novalidate>
+          <div class="login-field">
+            <label for="login-email">Email address</label>
+            <input id="login-email" type="email" placeholder="customer@festivecart.com" required autocomplete="email" />
+          </div>
+          <div class="login-field">
+            <label for="login-password">Password</label>
+            <input id="login-password" type="password" placeholder="Enter password" required autocomplete="current-password" />
+          </div>
+          <p id="login-error" class="login-error" hidden></p>
+          <button type="submit" class="login-submit-btn">Sign In →</button>
+        </form>
+
+        <div class="login-divider"><span>Quick Demo Sign-In (RBAC)</span></div>
+        <div class="login-demo-btns">
+          <button type="button" class="demo-role-btn demo-customer-btn" id="demo-customer-btn">
+            <span>🛍️</span>
+            <div>
+              <strong>Customer</strong>
+              <small>customer@festivecart.com</small>
+            </div>
+          </button>
+          <button type="button" class="demo-role-btn demo-admin-btn" id="demo-admin-btn">
+            <span>🛠️</span>
+            <div>
+              <strong>Admin</strong>
+              <small>admin@festivecart.com</small>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ ADMIN DASHBOARD (shown only when logged in as Admin) ══════════════ -->
+    <div id="admin-dashboard" class="admin-dashboard" hidden></div>
+
+    <!-- ══════════════ APP SHELL (shown only when logged in as Customer) ══════════════ -->
+    <div id="app-shell" hidden>
+
     <!-- Decoration layer (populated by theme engine, pointer-events:none) -->
     <div id="decoration-layer" aria-hidden="true"></div>
 
@@ -65,6 +113,16 @@
 
         <!-- Header actions -->
         <div class="header-actions">
+          <!-- User role badge & logout -->
+          <div class="hdr-user" id="hdr-user">
+            <span class="hdr-user-avatar" id="hdr-user-avatar">PS</span>
+            <div class="hdr-user-meta">
+              <span class="hdr-user-name" id="hdr-user-name">User</span>
+              <span class="hdr-user-role" id="hdr-user-role">customer</span>
+            </div>
+            <button class="hdr-logout-btn" id="hdr-logout-btn" title="Sign out" aria-label="Sign out">Logout</button>
+          </div>
+
           <!-- Wishlist -->
           <button class="hdr-btn" aria-label="Wishlist">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
@@ -263,13 +321,15 @@
           <div class="cart-total-row"><span>Subtotal</span><span id="cart-subtotal">₹0</span></div>
           <div class="cart-total-row cart-total-row--delivery"><span>Delivery</span><span class="cart-free">FREE</span></div>
           <div class="cart-total-row cart-grand"><span>Total</span><span id="cart-grand">₹0</span></div>
-          <button class="btn btn-primary btn-checkout">Proceed to Checkout →</button>
+          <button class="btn btn-primary btn-checkout" id="checkout-start-btn">Proceed to Checkout →</button>
         </div>
       </div>
     </div>
 
     <!-- Toast -->
     <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    </div><!-- /#app-shell -->
 
     <script type="module" src="/src/main.js"></script>
   </body>

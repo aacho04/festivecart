@@ -1,34 +1,33 @@
 /**
  * admin.js — Admin panel logic with RBAC gate.
  *
- * The gear button (⚙️) is hidden from customers by default.
- * Only authenticated admins (via rbac.js PIN flow) can see it.
- *
- * Bug fixes:
- *  - Close button: use document-level delegated listener so it always fires.
- *  - Panel is never rendered for non-admins.
+ * Only visible when logged in as an Admin (via auth.js).
+ * Customers never see the gear button or admin panel.
  */
 
-import { FESTIVALS } from "./festivals.js";
+import { FESTIVALS, getActiveFestival } from "./festivals.js";
 import { getFestiveMode, getExperimentVariation, sdkReady } from "./flagsmith-client.js";
-import { isAdmin, logoutAdmin } from "./rbac.js";
+import { isAdmin } from "./auth.js";
 
 /* ─── State ──────────────────────────────────────────────── */
 let _simulatedDate    = null;
-let _festiveOverride  = null;
+let _festiveOverride  = null;   // null = use Flagsmith; true/false = local override
 let _onChangeCallback = null;
+let _initialized      = false;
 
-export function getEffectiveDate()       { return _simulatedDate ?? new Date(); }
-export function getEffectiveFestiveMode(){ return _festiveOverride !== null ? _festiveOverride : getFestiveMode(); }
-export function hasLocalOverride()       { return _festiveOverride !== null; }
+export function getEffectiveDate()        { return _simulatedDate ?? new Date(); }
+export function getEffectiveFestiveMode() { return _festiveOverride !== null ? _festiveOverride : getFestiveMode(); }
+export function hasLocalOverride()        { return _festiveOverride !== null; }
+export function hasSimulatedDate()        { return _simulatedDate !== null; }
 
-/* ─── Open / close helpers (exported so rbac.js can call) ── */
+/* ─── Open / close helpers ───────────────────────────────── */
 export function openAdminPanel() {
+  if (!isAdmin()) return;
   const panel   = document.getElementById("admin-panel");
   const gearBtn = document.getElementById("admin-toggle-btn");
   if (panel)   panel.hidden = false;
   if (gearBtn) gearBtn.setAttribute("aria-expanded", "true");
-  updateStatusDisplay();
+  updateStatusDisplay(getEffectiveFestiveMode() ? getActiveFestival(getEffectiveDate()) : null);
 }
 
 export function closeAdminPanel() {
@@ -38,11 +37,24 @@ export function closeAdminPanel() {
   if (gearBtn) gearBtn.setAttribute("aria-expanded", "false");
 }
 
+/** Shows or hides the entire admin wrapper based on current user's role */
+export function syncAdminVisibility() {
+  const wrapper = document.getElementById("admin-panel-wrapper");
+  const gearBtn = document.getElementById("admin-toggle-btn");
+  const admin   = isAdmin();
+
+  if (wrapper) wrapper.style.display = admin ? "flex" : "none";
+  if (gearBtn) gearBtn.style.display = admin ? "flex" : "none";
+  if (!admin)  closeAdminPanel();
+}
+
 /* ─── Init ───────────────────────────────────────────────── */
 export function initAdminPanel(onChangeCallback) {
   _onChangeCallback = onChangeCallback;
+  syncAdminVisibility();
 
-  if (!isAdmin()) return;   // ← RBAC gate: nothing wired for customers
+  if (!isAdmin() || _initialized) return;
+  _initialized = true;
 
   const panel         = document.getElementById("admin-panel");
   const toggleBtn     = document.getElementById("admin-toggle-btn");
@@ -55,8 +67,7 @@ export function initAdminPanel(onChangeCallback) {
 
   if (!panel) return;
 
-  // ── Close button — delegated on document so it always fires ───────
-  // (Fixes the bug where the button click was swallowed)
+  // ── Close button (delegated so it always fires) ───────────────────
   document.addEventListener("click", (e) => {
     if (e.target.closest("#admin-close-btn")) {
       closeAdminPanel();
@@ -68,22 +79,35 @@ export function initAdminPanel(onChangeCallback) {
     panel.hidden ? openAdminPanel() : closeAdminPanel();
   });
 
-  // ── Keyboard shortcut: Ctrl+Shift+Alt+A (matches rbac.js) ─────────
-  // (rbac.js handles the shortcut; nothing extra needed here)
-
-  // ── Populate festival dropdown ────────────────────────────────────
-  FESTIVALS.forEach((f) => {
-    const opt = document.createElement("option");
-    opt.value = f.id;
-    opt.textContent = f.name;
-    festivalSel?.appendChild(opt);
+  // ── Keyboard shortcut: Shift+A (for admin only) ───────────────────
+  document.addEventListener("keydown", (e) => {
+    if (!isAdmin()) return;
+    if (e.key === "A" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+      panel.hidden ? openAdminPanel() : closeAdminPanel();
+    }
   });
+
+  // ── Populate festival dropdown (only once) ────────────────────────
+  if (festivalSel && festivalSel.options.length <= 1) {
+    FESTIVALS.forEach((f) => {
+      const opt = document.createElement("option");
+      opt.value = f.id;
+      opt.textContent = f.name;
+      festivalSel.appendChild(opt);
+    });
+  }
 
   // ── Set date picker to today ──────────────────────────────────────
   if (datePicker) datePicker.value = toDateInputValue(new Date());
 
   // ── Festive mode toggle ───────────────────────────────────────────
-  updateToggleUI(getFestiveMode());
+  function updateToggleUI(value) {
+    festiveToggle?.setAttribute("aria-checked", String(!!value));
+    festiveToggle?.classList.toggle("on", !!value);
+  }
+
+  updateToggleUI(getEffectiveFestiveMode());
 
   festiveToggle?.addEventListener("click", () => {
     const current = festiveToggle.getAttribute("aria-checked") === "true";
@@ -94,18 +118,15 @@ export function initAdminPanel(onChangeCallback) {
     notifyChange();
   });
 
+  // ── "Use Flagsmith value" button ──────────────────────────────────
   useFlagBtn?.addEventListener("click", () => {
     _festiveOverride = null;
-    updateToggleUI(getFestiveMode());
+    const flagVal = getFestiveMode();
+    updateToggleUI(flagVal);
     if (overrideLabel) overrideLabel.hidden = true;
     if (useFlagBtn)    useFlagBtn.hidden    = true;
     notifyChange();
   });
-
-  function updateToggleUI(value) {
-    festiveToggle?.setAttribute("aria-checked", String(value));
-    festiveToggle?.classList.toggle("on", !!value);
-  }
 
   // ── Festival selector ─────────────────────────────────────────────
   festivalSel?.addEventListener("change", () => {
@@ -142,20 +163,17 @@ export function initAdminPanel(onChangeCallback) {
     notifyChange();
   });
 
-  // ── Logout button ─────────────────────────────────────────────────
-  const logoutBtn = document.getElementById("admin-logout-btn");
-  logoutBtn?.addEventListener("click", () => {
-    logoutAdmin();
-    closeAdminPanel();
-    if (toggleBtn) toggleBtn.style.display = "none";
-    showAdminToast("👋 Logged out of admin mode");
+  // ── Logout button inside admin panel ──────────────────────────────
+  document.getElementById("admin-logout-btn")?.addEventListener("click", () => {
+    window.dispatchEvent(new CustomEvent("fc-logout"));
   });
 
-  updateStatusDisplay();
+  updateStatusDisplay(getEffectiveFestiveMode() ? getActiveFestival(getEffectiveDate()) : null);
 }
 
 function notifyChange() {
-  updateStatusDisplay();
+  const active = getEffectiveFestiveMode() ? getActiveFestival(getEffectiveDate()) : null;
+  updateStatusDisplay(active);
   if (_onChangeCallback) _onChangeCallback();
 }
 
@@ -174,7 +192,7 @@ export function updateStatusDisplay(activeFestival) {
   const rows = [
     ["📅 Date",        _simulatedDate ? `${dateStr} (simulated)` : `${dateStr} (today)`],
     ["🎉 Festival",    activeFestival?.name ?? "none"],
-    ["🚩 Festive mode",festiveOn
+    ["🚩 Festive mode", festiveOn
       ? (_festiveOverride !== null ? "ON (local override)" : "ON (Flagsmith)")
       : (_festiveOverride !== null ? "OFF (local override)" : "OFF (Flagsmith)")],
     ["🧪 Experiment",  sdkReady ? `variation: ${variation}` : "not connected (no env key)"],
@@ -184,14 +202,6 @@ export function updateStatusDisplay(activeFestival) {
     .map(([label, val]) =>
       `<div class="status-row"><span class="status-label">${label}</span><span class="status-val">${val}</span></div>`)
     .join("");
-}
-
-function showAdminToast(msg) {
-  const el = document.getElementById("toast");
-  if (!el) return;
-  el.textContent = msg;
-  el.classList.add("visible");
-  setTimeout(() => el.classList.remove("visible"), 2500);
 }
 
 function toDateInputValue(date) {
