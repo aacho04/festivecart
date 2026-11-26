@@ -1053,3 +1053,189 @@ img { display: block; }
   .hero-content { padding: 1.75rem 1rem; }
   #admin-panel-wrapper { bottom: 1rem; right: 1rem; }
 }
+
+/* ══════════════════════════════════════════
+   ADMIN LOGIN MODAL (RBAC)
+══════════════════════════════════════════ */
+#admin-login-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  animation: overlay-in 0.2s ease;
+}
+#admin-login-modal[hidden] { display: none; }
+
+.admin-login-box {
+  background: white;
+  border-radius: 16px;
+  width: 380px;
+  max-width: 92vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  overflow: hidden;
+  animation: panel-slide-up 0.25s ease;
+}
+
+@keyframes panel-slide-up {
+  from { transform: translateY(30px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.admin-login-header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: white;
+  padding: 2rem 1.75rem 1.5rem;
+  text-align: center;
+}
+.admin-login-icon { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+.admin-login-title { font-size: 1.3rem; font-weight: 800; margin-bottom: 0.4rem; }
+.admin-login-sub { font-size: 0.82rem; opacity: 0.75; }
+
+.admin-login-body {
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.admin-login-label { font-size: 0.82rem; font-weight: 700; color: #333; }
+
+.admin-pin-input {
+  width: 100%;
+  border: 2px solid #E0E0E0;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  font-size: 1.5rem;
+  letter-spacing: 0.5em;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+  color: #333;
+}
+.admin-pin-input:focus { border-color: var(--color-primary); }
+
+.admin-pin-error {
+  background: #FFF0F0;
+  color: #C0392B;
+  border: 1px solid #FFCDD2;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.admin-pin-error[hidden] { display: none; }
+
+.admin-login-btn {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+.admin-login-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+.admin-login-cancel {
+  background: none;
+  border: 1.5px solid #DDD;
+  border-radius: 8px;
+  padding: 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s;
+}
+.admin-login-cancel:hover { background: #F5F5F5; border-color: #999; }
+
+.admin-login-hint {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #888;
+  padding: 0.75rem;
+  background: #FAFAFA;
+  border-top: 1px solid #EEE;
+}
+.admin-login-hint strong { color: #333; }
+
+/* ── Admin logout button ── */
+.admin-logout-btn {
+  background: #FFF0F0 !important;
+  color: #C0392B !important;
+  border-color: #FFCDD2 !important;
+  width: 100%;
+  margin-top: 0.25rem;
+}
+.admin-logout-btn:hover {
+  background: #C0392B !important;
+  color: white !important;
+}
+
+/* ── Gear button: hidden by default (JS shows it after auth) ── */
+#admin-toggle-btn { display: none; }
+
+/* ══════════════════════════════════════════
+   NO-PRODUCTS EMPTY STATE
+══════════════════════════════════════════ */
+.no-products {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 4rem 2rem;
+  background: white;
+  border-radius: 12px;
+  border: 1.5px dashed #E0E0E0;
+}
+.no-products-icon { font-size: 4rem; margin-bottom: 1rem; }
+.no-products h3 { font-size: 1.1rem; font-weight: 700; color: #333; margin-bottom: 0.5rem; }
+.no-products p  { color: #888; font-size: 0.875rem; margin-bottom: 1.25rem; }
+
+/* ── Product image fallback ── */
+.product-img-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 4rem;
+  background: #F5F5F5;
+}
+
+/* ── Category card active state ── */
+.cat-card.active {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, white);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
+.cat-card.active .cat-card-label { color: var(--color-primary); }
+
+/* ── Category nav active/hover ── */
+.cat-nav-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.65rem 1.1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+.cat-nav-link:hover,
+.cat-nav-link.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+.cat-nav-link .cat-nav-icon { font-size: 1.3rem; }
+
+/* Products section heading ID fix */
+#products-section-title { scroll-margin-top: 120px; }

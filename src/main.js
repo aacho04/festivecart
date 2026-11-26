@@ -1,5 +1,10 @@
 /**
- * main.js — FestiveCart entry point (realistic e-commerce UI)
+ * main.js — FestiveCart entry point
+ *
+ * Fixes in this version:
+ *  1. Category filtering — clicking a category card/nav shows only those products
+ *  2. Admin panel close button — delegated listener in admin.js always fires
+ *  3. RBAC — gear button hidden; admin login modal via Ctrl+Shift+Alt+A or ?admin=1
  */
 
 import { PRODUCTS, CATEGORIES } from "./products.js";
@@ -10,14 +15,19 @@ import {
   trackAddToCart, flushEvents, getUserId,
 } from "./flagsmith-client.js";
 import {
-  initAdminPanel, getEffectiveDate, getEffectiveFestiveMode, updateStatusDisplay,
+  initAdminPanel, getEffectiveDate, getEffectiveFestiveMode,
+  updateStatusDisplay, openAdminPanel,
 } from "./admin.js";
+import { initRbac } from "./rbac.js";
+
+/* ─── Active category filter state ──────────────────────── */
+let _activeCategory = "all";   // matches CATEGORIES[n].id
 
 /* ─── Cart state ──────────────────────────────────────────── */
-let cart = [];   // [{ product, qty }]
+let cart = [];
 
-function getCartCount()  { return cart.reduce((s, i) => s + i.qty, 0); }
-function getCartTotal()  { return cart.reduce((s, i) => s + i.product.price * i.qty, 0); }
+function getCartCount() { return cart.reduce((s, i) => s + i.qty, 0); }
+function getCartTotal() { return cart.reduce((s, i) => s + i.product.price * i.qty, 0); }
 
 function addToCart(product) {
   const existing = cart.find(i => i.product.id === product.id);
@@ -37,17 +47,17 @@ function removeFromCart(productId) {
 
 function updateCartUI() {
   const count = getCartCount();
-  const countEl = document.getElementById("cart-count");
+  const countEl      = document.getElementById("cart-count");
   const panelCountEl = document.getElementById("cart-panel-count");
-  if (countEl) countEl.textContent = count;
+  if (countEl)      countEl.textContent = count;
   if (panelCountEl) panelCountEl.textContent = `(${count} item${count !== 1 ? "s" : ""})`;
   const btn = document.getElementById("cart-btn");
   if (btn) btn.setAttribute("aria-label", `Cart (${count} items)`);
 }
 
 function renderCartPanel() {
-  const itemsEl  = document.getElementById("cart-items");
-  const footerEl = document.getElementById("cart-footer");
+  const itemsEl    = document.getElementById("cart-items");
+  const footerEl   = document.getElementById("cart-footer");
   const subtotalEl = document.getElementById("cart-subtotal");
   const grandEl    = document.getElementById("cart-grand");
   if (!itemsEl) return;
@@ -69,7 +79,10 @@ function renderCartPanel() {
            onerror="this.style.background='#f5f5f5';this.src=''" />
       <div class="cart-item-info">
         <div class="cart-item-name">${product.name}</div>
-        <div class="cart-item-price">₹${(product.price * qty).toLocaleString("en-IN")} <span style="font-size:.75rem;color:#888;font-weight:400">× ${qty}</span></div>
+        <div class="cart-item-price">
+          ₹${(product.price * qty).toLocaleString("en-IN")}
+          <span style="font-size:.75rem;color:#888;font-weight:400"> × ${qty}</span>
+        </div>
         <button class="cart-item-remove" data-id="${product.id}">Remove</button>
       </div>
     </div>`).join("");
@@ -86,27 +99,37 @@ function renderCartPanel() {
 
 /* ─── Cart sidebar open/close ─────────────────────────────── */
 function initCart() {
-  const cartBtn     = document.getElementById("cart-btn");
-  const overlay     = document.getElementById("cart-overlay");
-  const closeBtn    = document.getElementById("cart-close-btn");
+  const cartBtn  = document.getElementById("cart-btn");
+  const overlay  = document.getElementById("cart-overlay");
+  const closeBtn = document.getElementById("cart-close-btn");
 
-  cartBtn?.addEventListener("click", () => {
+  cartBtn?.addEventListener("click", () => openCart());
+  closeBtn?.addEventListener("click", closeCart);
+
+  // Click backdrop to close
+  overlay?.addEventListener("click", e => { if (e.target === overlay) closeCart(); });
+
+  // Escape key to close
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && overlay && !overlay.hidden) closeCart();
+  });
+
+  function openCart() {
+    if (!overlay) return;
     overlay.hidden = false;
     document.body.style.overflow = "hidden";
     renderCartPanel();
-  });
-
-  closeBtn?.addEventListener("click", closeCart);
-  overlay?.addEventListener("click", e => { if (e.target === overlay) closeCart(); });
-
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && !overlay?.hidden) closeCart();
-  });
+  }
 
   function closeCart() {
-    if (overlay) overlay.hidden = true;
+    if (!overlay) return;
+    overlay.hidden = true;
     document.body.style.overflow = "";
   }
+
+  // Expose closeCart globally for Buy Now
+  window._closeCart = closeCart;
+  window._openCart  = openCart;
 }
 
 /* ─── Toast ───────────────────────────────────────────────── */
@@ -120,35 +143,92 @@ function showToast(msg) {
   _toastTimer = setTimeout(() => el.classList.remove("visible"), 2500);
 }
 
-/* ─── Category nav ────────────────────────────────────────── */
+/* ─── Category nav (top horizontal bar) ──────────────────── */
 function renderCategoryNav() {
   const list = document.getElementById("cat-nav-list");
   if (!list) return;
+
   list.innerHTML = CATEGORIES.map((c, i) => `
     <li>
-      <a href="#products" class="${i === 0 ? "active" : ""}" data-cat="${c.id}">
+      <a href="#"
+         class="cat-nav-link ${i === 0 ? "active" : ""}"
+         data-cat="${c.id}"
+         aria-label="Filter by ${c.label}">
         <span class="cat-nav-icon">${c.icon}</span>
-        ${c.label}
+        <span>${c.label}</span>
       </a>
     </li>`).join("");
 
-  list.querySelectorAll("a").forEach(a => {
-    a.addEventListener("click", () => {
-      list.querySelectorAll("a").forEach(x => x.classList.remove("active"));
-      a.classList.add("active");
-    });
+  // Filter on click
+  list.addEventListener("click", e => {
+    const link = e.target.closest(".cat-nav-link");
+    if (!link) return;
+    e.preventDefault();
+    const cat = link.dataset.cat;
+    setActiveCategory(cat);
+
+    // Update active styling
+    list.querySelectorAll(".cat-nav-link").forEach(a => a.classList.remove("active"));
+    link.classList.add("active");
   });
 }
 
-/* ─── Category cards ──────────────────────────────────────── */
+/* ─── Category cards (the icon grid below hero) ──────────── */
 function renderCategoryCards() {
   const grid = document.getElementById("cat-cards-grid");
   if (!grid) return;
-  grid.innerHTML = CATEGORIES.map(c => `
-    <div class="cat-card" role="button" tabindex="0" aria-label="${c.label}">
+
+  grid.innerHTML = CATEGORIES.map((c, i) => `
+    <div class="cat-card ${i === 0 ? "active" : ""}"
+         role="button" tabindex="0"
+         aria-label="Show ${c.label}"
+         data-cat="${c.id}">
       <div class="cat-card-icon">${c.icon}</div>
       <div class="cat-card-label">${c.label}</div>
     </div>`).join("");
+
+  // Filter on click
+  grid.addEventListener("click", e => {
+    const card = e.target.closest(".cat-card");
+    if (!card) return;
+    const cat = card.dataset.cat;
+    setActiveCategory(cat);
+
+    // Sync card highlight
+    grid.querySelectorAll(".cat-card").forEach(c => c.classList.remove("active"));
+    card.classList.add("active");
+
+    // Sync nav bar too
+    document.querySelectorAll(".cat-nav-link").forEach(a => {
+      a.classList.toggle("active", a.dataset.cat === cat);
+    });
+
+    // Smooth scroll to products
+    document.getElementById("main")?.scrollIntoView({ behavior: "smooth" });
+  });
+
+  // Keyboard support
+  grid.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") {
+      const card = e.target.closest(".cat-card");
+      if (card) card.click();
+    }
+  });
+}
+
+/** Sets the active category and re-renders the product grid */
+function setActiveCategory(cat) {
+  _activeCategory = cat;
+  applyTheme();      // re-renders products with the new filter
+
+  // Update section title
+  const title = document.getElementById("products-section-title");
+  if (title) {
+    const found = CATEGORIES.find(c => c.id === cat);
+    title.textContent = cat === "all"
+      ? "Featured Products"
+      : `${found?.icon ?? ""} ${found?.label ?? cat}`;
+  }
 }
 
 /* ─── Deal countdown timer ────────────────────────────────── */
@@ -158,14 +238,12 @@ function startDealTimer() {
   const sEl = document.getElementById("timer-s");
   if (!hEl || !mEl || !sEl) return;
 
-  // End at midnight
   function tick() {
-    const now  = new Date();
-    const end  = new Date(now);
+    const now = new Date();
+    const end = new Date(now);
     end.setHours(23, 59, 59, 0);
     let diff = Math.max(0, Math.floor((end - now) / 1000));
-    const h = Math.floor(diff / 3600);
-    diff %= 3600;
+    const h = Math.floor(diff / 3600); diff %= 3600;
     const m = Math.floor(diff / 60);
     const s = diff % 60;
     hEl.textContent = String(h).padStart(2, "0");
@@ -181,8 +259,29 @@ function renderProducts(festival) {
   const grid = document.getElementById("product-grid");
   if (!grid) return;
 
-  grid.innerHTML = PRODUCTS.map(p => {
+  // Filter by active category
+  const filtered = _activeCategory === "all"
+    ? PRODUCTS
+    : PRODUCTS.filter(p => p.categoryId === _activeCategory);
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div class="no-products">
+        <div class="no-products-icon">🔍</div>
+        <h3>No products in this category yet</h3>
+        <p>Check back soon or browse all products.</p>
+        <button class="btn btn-primary" onclick="document.querySelector('[data-cat=all]')?.click()">
+          View All Products
+        </button>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(p => {
     const discount = Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100);
+    const festBadge = festival?.productBadge
+      ? `<span class="badge badge-festival">${festival.productBadge}</span>`
+      : "";
     return `
       <article class="product-card" role="listitem" data-id="${p.id}" tabindex="0"
                aria-label="${p.name}, ₹${p.price.toLocaleString("en-IN")}">
@@ -192,15 +291,16 @@ function renderProducts(festival) {
             src="${p.image}"
             alt="${p.name}"
             loading="lazy"
-            onerror="this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;font-size:4rem;background:#f5f5f5\'>📦</div>'"
+            onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'product-img-fallback\\'>📦</div>'"
           />
           <div class="product-badges">
             <span class="badge badge-discount">${discount}% off</span>
             ${p.badge ? `<span class="badge badge-seller">${p.badge}</span>` : ""}
-            <span class="badge badge-festival" hidden></span>
+            ${festBadge}
           </div>
-          <button class="wishlist-btn" aria-label="Add ${p.name} to wishlist" data-wish-id="${p.id}">🤍</button>
+          <button class="wishlist-btn" aria-label="Wishlist ${p.name}" data-id="${p.id}">🤍</button>
         </div>
+
         <div class="product-info">
           <span class="product-category">${p.category}</span>
           <h3 class="product-name">${p.name}</h3>
@@ -216,6 +316,7 @@ function renderProducts(festival) {
           </div>
           <div class="product-delivery">${p.delivery}</div>
         </div>
+
         <div class="product-card-actions">
           <button class="btn-add-to-cart" data-product-id="${p.id}"
                   aria-label="Add ${p.name} to cart">
@@ -229,12 +330,11 @@ function renderProducts(festival) {
       </article>`;
   }).join("");
 
-  /* Add to Cart */
+  // ── Wire Add to Cart ──────────────────────────────────────
   grid.querySelectorAll(".btn-add-to-cart").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
-      const id = Number(btn.dataset.productId);
-      const product = PRODUCTS.find(p => p.id === id);
+      const product = PRODUCTS.find(p => p.id === Number(btn.dataset.productId));
       if (!product) return;
       addToCart(product);
       btn.textContent = "✓ Added!";
@@ -243,21 +343,18 @@ function renderProducts(festival) {
     });
   });
 
-  /* Buy Now */
+  // ── Wire Buy Now ──────────────────────────────────────────
   grid.querySelectorAll(".btn-buy-now").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
-      const id = Number(btn.dataset.productId);
-      const product = PRODUCTS.find(p => p.id === id);
+      const product = PRODUCTS.find(p => p.id === Number(btn.dataset.productId));
       if (!product) return;
       addToCart(product);
-      // Open cart immediately
-      const overlay = document.getElementById("cart-overlay");
-      if (overlay) { overlay.hidden = false; document.body.style.overflow = "hidden"; renderCartPanel(); }
+      window._openCart?.();
     });
   });
 
-  /* Wishlist toggle */
+  // ── Wire Wishlist ─────────────────────────────────────────
   grid.querySelectorAll(".wishlist-btn").forEach(btn => {
     btn.addEventListener("click", e => {
       e.stopPropagation();
@@ -267,70 +364,45 @@ function renderProducts(festival) {
     });
   });
 
-  /* Festival badges */
   updateProductBadges(festival);
 }
 
-/* ─── Hero visual emoji per festival ─────────────────────── */
+/* ─── Hero visual per festival ────────────────────────────── */
 const HERO_VISUALS = {
-  halloween: "🎃",
-  diwali: "🪔",
-  christmas: "🎄",
-  "new-year": "🎆",
-  "makar-sankranti": "🪁",
-  "republic-day": "🇮🇳",
-  valentines: "💕",
-  eid: "🌙",
-  holi: "🎨",
-  "ganesh-chaturthi": "🐘",
+  halloween:"🎃", diwali:"🪔", christmas:"🎄", "new-year":"🎆",
+  "makar-sankranti":"🪁", "republic-day":"🇮🇳", valentines:"💕",
+  eid:"🌙", holi:"🎨", "ganesh-chaturthi":"🐘",
 };
 
 /* ─── Theme orchestrator ──────────────────────────────────── */
 function applyTheme() {
-  const date       = getEffectiveDate();
-  const festiveOn  = getEffectiveFestiveMode();
-  const variation  = getExperimentVariation();
+  const date      = getEffectiveDate();
+  const festiveOn = getEffectiveFestiveMode();
+  const variation = getExperimentVariation();
 
   const activeFestival = festiveOn ? getActiveFestival(date) : null;
-  const showFestive    = activeFestival && variation === "festive";
+  const showFestive    = !!(activeFestival && variation === "festive");
 
-  if (showFestive) {
-    applyFestivalTheme(activeFestival);
-  } else {
-    applyNormalTheme();
-  }
+  showFestive ? applyFestivalTheme(activeFestival) : applyNormalTheme();
 
-  // Hero visual
   const heroVisual = document.getElementById("hero-visual");
-  if (heroVisual) {
-    heroVisual.textContent = showFestive
-      ? (HERO_VISUALS[activeFestival.id] ?? "🎉")
-      : "🛒";
-  }
+  if (heroVisual) heroVisual.textContent = showFestive ? (HERO_VISUALS[activeFestival.id] ?? "🎉") : "🛒";
 
-  // Hero tag
   const heroTag = document.getElementById("hero-tag");
-  if (heroTag) {
-    heroTag.textContent = showFestive
-      ? `🎉 ${activeFestival.name} Sale`
-      : "🔥 Deals of the Day";
-  }
+  if (heroTag) heroTag.textContent = showFestive ? `🎉 ${activeFestival.name} Sale` : "🔥 Deals of the Day";
 
   renderProducts(showFestive ? activeFestival : null);
   updateStatusDisplay(activeFestival);
 
-  // Footer experiment info
   const expEl = document.getElementById("footer-experiment");
-  if (expEl) {
-    expEl.textContent = `🧪 Experiment variation: ${variation} · User: ${getUserId().slice(0, 14)}…`;
-  }
+  if (expEl) expEl.textContent = `🧪 Experiment variation: ${variation} · User: ${getUserId().slice(0, 14)}…`;
 }
 
-/* ─── Shop Now scroll ─────────────────────────────────────── */
+/* ─── Shop Now button ─────────────────────────────────────── */
 function initHeroBtn() {
-  document.getElementById("shop-now-btn")?.addEventListener("click", () => {
-    document.getElementById("main")?.scrollIntoView({ behavior: "smooth" });
-  });
+  document.getElementById("shop-now-btn")
+    ?.addEventListener("click", () =>
+      document.getElementById("main")?.scrollIntoView({ behavior: "smooth" }));
 }
 
 /* ─── Flush on unload ─────────────────────────────────────── */
@@ -343,28 +415,35 @@ function registerFlush() {
 
 /* ─── BOOT ────────────────────────────────────────────────── */
 async function boot() {
-  // Render structural elements immediately
+  // 1. Render UI immediately (no blank flash)
   renderCategoryNav();
   renderCategoryCards();
+  startDealTimer();
+  applyNormalTheme();
   renderProducts(null);
   initCart();
   initHeroBtn();
-  startDealTimer();
-  applyNormalTheme();
 
-  // Load Flagsmith (non-blocking)
+  // 2. Init RBAC — sets up admin login modal & gear button visibility
+  initRbac(() => {
+    // Called after successful admin login
+    initAdminPanel(() => applyTheme());
+    openAdminPanel();
+  });
+
+  // 3. Load Flagsmith (non-blocking)
   await initFlagsmith();
 
-  // Apply theme once flags are ready
+  // 4. Apply theme with real flag values
   applyTheme();
 
-  // Admin panel (triggers re-render on every change)
+  // 5. Init admin panel IF already authenticated from this session
   initAdminPanel(() => applyTheme());
 
   registerFlush();
 
-  console.info("[FestiveCart] Ready. User ID:", getUserId());
-  console.info("[FestiveCart] Press Shift+A to open the Admin Panel.");
+  console.info("[FestiveCart] Ready. User:", getUserId());
+  console.info("[FestiveCart] Admin access: Ctrl+Shift+Alt+A or ?admin=1");
 }
 
 boot().catch(console.error);

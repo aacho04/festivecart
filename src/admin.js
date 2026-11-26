@@ -1,44 +1,51 @@
 /**
- * admin.js
- * Admin / Demo panel logic.
- * Provides local overrides for festive mode, simulated date, and festival selection.
- * Clearly labelled as a demo/admin tool — not shown in production without interaction.
+ * admin.js — Admin panel logic with RBAC gate.
+ *
+ * The gear button (⚙️) is hidden from customers by default.
+ * Only authenticated admins (via rbac.js PIN flow) can see it.
+ *
+ * Bug fixes:
+ *  - Close button: use document-level delegated listener so it always fires.
+ *  - Panel is never rendered for non-admins.
  */
 
 import { FESTIVALS } from "./festivals.js";
 import { getFestiveMode, getExperimentVariation, sdkReady } from "./flagsmith-client.js";
+import { isAdmin, logoutAdmin } from "./rbac.js";
 
-/* ─── State ───────────────────────────────────────────────────────────────── */
-let _simulatedDate = null;      // null → use real date
-let _festiveOverride = null;    // null → use Flagsmith value; true/false → local override
-let _onChangeCallback = null;   // called whenever state changes
+/* ─── State ──────────────────────────────────────────────── */
+let _simulatedDate    = null;
+let _festiveOverride  = null;
+let _onChangeCallback = null;
 
-/* ─── Accessors ──────────────────────────────────────────────────────────── */
+export function getEffectiveDate()       { return _simulatedDate ?? new Date(); }
+export function getEffectiveFestiveMode(){ return _festiveOverride !== null ? _festiveOverride : getFestiveMode(); }
+export function hasLocalOverride()       { return _festiveOverride !== null; }
 
-/** Returns the date the app should use (simulated or real today) */
-export function getEffectiveDate() {
-  return _simulatedDate ?? new Date();
+/* ─── Open / close helpers (exported so rbac.js can call) ── */
+export function openAdminPanel() {
+  const panel   = document.getElementById("admin-panel");
+  const gearBtn = document.getElementById("admin-toggle-btn");
+  if (panel)   panel.hidden = false;
+  if (gearBtn) gearBtn.setAttribute("aria-expanded", "true");
+  updateStatusDisplay();
 }
 
-/** Returns effective festive mode (override or Flagsmith) */
-export function getEffectiveFestiveMode() {
-  if (_festiveOverride !== null) return _festiveOverride;
-  return getFestiveMode();
+export function closeAdminPanel() {
+  const panel   = document.getElementById("admin-panel");
+  const gearBtn = document.getElementById("admin-toggle-btn");
+  if (panel)   panel.hidden = true;
+  if (gearBtn) gearBtn.setAttribute("aria-expanded", "false");
 }
 
-/** Returns whether we're using a local override */
-export function hasLocalOverride() {
-  return _festiveOverride !== null;
-}
-
-/* ─── Init ───────────────────────────────────────────────────────────────── */
-
+/* ─── Init ───────────────────────────────────────────────── */
 export function initAdminPanel(onChangeCallback) {
   _onChangeCallback = onChangeCallback;
 
+  if (!isAdmin()) return;   // ← RBAC gate: nothing wired for customers
+
   const panel         = document.getElementById("admin-panel");
   const toggleBtn     = document.getElementById("admin-toggle-btn");
-  const closeBtn      = document.getElementById("admin-close-btn");
   const festiveToggle = document.getElementById("festive-toggle");
   const overrideLabel = document.getElementById("override-label");
   const useFlagBtn    = document.getElementById("use-flagsmith-btn");
@@ -46,154 +53,147 @@ export function initAdminPanel(onChangeCallback) {
   const datePicker    = document.getElementById("date-picker");
   const resetBtn      = document.getElementById("reset-date-btn");
 
-  if (!panel) return; // Safety guard
+  if (!panel) return;
 
-  // ── Populate festival dropdown ─────────────────────────────────────────
+  // ── Close button — delegated on document so it always fires ───────
+  // (Fixes the bug where the button click was swallowed)
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("#admin-close-btn")) {
+      closeAdminPanel();
+    }
+  });
+
+  // ── Gear button toggle ────────────────────────────────────────────
+  toggleBtn?.addEventListener("click", () => {
+    panel.hidden ? openAdminPanel() : closeAdminPanel();
+  });
+
+  // ── Keyboard shortcut: Ctrl+Shift+Alt+A (matches rbac.js) ─────────
+  // (rbac.js handles the shortcut; nothing extra needed here)
+
+  // ── Populate festival dropdown ────────────────────────────────────
   FESTIVALS.forEach((f) => {
     const opt = document.createElement("option");
     opt.value = f.id;
     opt.textContent = f.name;
-    festivalSel.appendChild(opt);
+    festivalSel?.appendChild(opt);
   });
 
-  // ── Set date picker to today ───────────────────────────────────────────
-  datePicker.value = toDateInputValue(new Date());
+  // ── Set date picker to today ──────────────────────────────────────
+  if (datePicker) datePicker.value = toDateInputValue(new Date());
 
-  // ── Panel open/close ───────────────────────────────────────────────────
-  function openPanel() {
-    panel.hidden = false;
-    toggleBtn.setAttribute("aria-expanded", "true");
-    updateStatusDisplay();
-  }
-
-  function closePanel() {
-    panel.hidden = true;
-    toggleBtn.setAttribute("aria-expanded", "false");
-  }
-
-  toggleBtn.addEventListener("click", () => {
-    panel.hidden ? openPanel() : closePanel();
-  });
-
-  closeBtn.addEventListener("click", closePanel);
-
-  // Keyboard shortcut: Shift+A
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "A" && e.shiftKey && !e.ctrlKey && !e.metaKey) {
-      // Don't fire when typing in an input
-      if (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "SELECT") return;
-      panel.hidden ? openPanel() : closePanel();
-    }
-  });
-
-  // ── Festive mode toggle ────────────────────────────────────────────────
-  // Reflect current Flagsmith value initially
+  // ── Festive mode toggle ───────────────────────────────────────────
   updateToggleUI(getFestiveMode());
 
-  festiveToggle.addEventListener("click", () => {
+  festiveToggle?.addEventListener("click", () => {
     const current = festiveToggle.getAttribute("aria-checked") === "true";
     _festiveOverride = !current;
     updateToggleUI(_festiveOverride);
-    overrideLabel.hidden = false;
-    useFlagBtn.hidden = false;
+    if (overrideLabel) overrideLabel.hidden = false;
+    if (useFlagBtn)    useFlagBtn.hidden    = false;
     notifyChange();
   });
 
-  useFlagBtn.addEventListener("click", () => {
+  useFlagBtn?.addEventListener("click", () => {
     _festiveOverride = null;
     updateToggleUI(getFestiveMode());
-    overrideLabel.hidden = true;
-    useFlagBtn.hidden = true;
+    if (overrideLabel) overrideLabel.hidden = true;
+    if (useFlagBtn)    useFlagBtn.hidden    = true;
     notifyChange();
   });
 
   function updateToggleUI(value) {
-    festiveToggle.setAttribute("aria-checked", String(value));
-    festiveToggle.classList.toggle("on", value);
+    festiveToggle?.setAttribute("aria-checked", String(value));
+    festiveToggle?.classList.toggle("on", !!value);
   }
 
-  // ── Festival selector ──────────────────────────────────────────────────
-  festivalSel.addEventListener("change", () => {
+  // ── Festival selector ─────────────────────────────────────────────
+  festivalSel?.addEventListener("change", () => {
     const id = festivalSel.value;
     if (!id) {
       _simulatedDate = null;
-      datePicker.value = toDateInputValue(new Date());
+      if (datePicker) datePicker.value = toDateInputValue(new Date());
     } else {
       const festival = FESTIVALS.find((f) => f.id === id);
       if (festival) {
         _simulatedDate = new Date(festival.startDate + "T00:00:00");
-        datePicker.value = festival.startDate;
+        if (datePicker) datePicker.value = festival.startDate;
       }
     }
     notifyChange();
   });
 
-  // ── Date picker ────────────────────────────────────────────────────────
-  datePicker.addEventListener("input", () => {
+  // ── Date picker ───────────────────────────────────────────────────
+  datePicker?.addEventListener("input", () => {
     const v = datePicker.value;
     if (v) {
       _simulatedDate = new Date(v + "T00:00:00");
-      // Sync festival selector
-      const matched = FESTIVALS.find(
-        (f) => v >= f.startDate && v <= f.endDate
-      );
-      festivalSel.value = matched ? matched.id : "";
+      const matched = FESTIVALS.find((f) => v >= f.startDate && v <= f.endDate);
+      if (festivalSel) festivalSel.value = matched ? matched.id : "";
     }
     notifyChange();
   });
 
-  // ── Reset to today ─────────────────────────────────────────────────────
-  resetBtn.addEventListener("click", () => {
+  // ── Reset to today ────────────────────────────────────────────────
+  resetBtn?.addEventListener("click", () => {
     _simulatedDate = null;
-    datePicker.value = toDateInputValue(new Date());
-    festivalSel.value = "";
+    if (datePicker)  datePicker.value = toDateInputValue(new Date());
+    if (festivalSel) festivalSel.value = "";
     notifyChange();
   });
 
-  // ── Initial status update ──────────────────────────────────────────────
+  // ── Logout button ─────────────────────────────────────────────────
+  const logoutBtn = document.getElementById("admin-logout-btn");
+  logoutBtn?.addEventListener("click", () => {
+    logoutAdmin();
+    closeAdminPanel();
+    if (toggleBtn) toggleBtn.style.display = "none";
+    showAdminToast("👋 Logged out of admin mode");
+  });
+
   updateStatusDisplay();
 }
 
-/** Call after any state change to refresh the status line and trigger re-render */
 function notifyChange() {
   updateStatusDisplay();
   if (_onChangeCallback) _onChangeCallback();
 }
 
-/** Updates the admin status text block */
 export function updateStatusDisplay(activeFestival) {
   const statusEl = document.getElementById("admin-status");
   if (!statusEl) return;
 
   const effectiveDate = getEffectiveDate();
-  const festiveOn = getEffectiveFestiveMode();
-  const variation = getExperimentVariation();
+  const festiveOn     = getEffectiveFestiveMode();
+  const variation     = getExperimentVariation();
 
   const dateStr = effectiveDate.toLocaleDateString("en-IN", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 
   const rows = [
-    ["📅 Date",       _simulatedDate ? `${dateStr} (simulated)` : `${dateStr} (today)`],
-    ["🎉 Festival",   activeFestival?.name ?? "none"],
-    ["🚩 Festive mode", festiveOn
+    ["📅 Date",        _simulatedDate ? `${dateStr} (simulated)` : `${dateStr} (today)`],
+    ["🎉 Festival",    activeFestival?.name ?? "none"],
+    ["🚩 Festive mode",festiveOn
       ? (_festiveOverride !== null ? "ON (local override)" : "ON (Flagsmith)")
       : (_festiveOverride !== null ? "OFF (local override)" : "OFF (Flagsmith)")],
-    ["🧪 Experiment",  sdkReady
-      ? `variation: ${variation}`
-      : "not connected (no env key)"],
+    ["🧪 Experiment",  sdkReady ? `variation: ${variation}` : "not connected (no env key)"],
   ];
 
   statusEl.innerHTML = rows
-    .map(([label, val]) => `<div class="status-row"><span class="status-label">${label}</span><span class="status-val">${val}</span></div>`)
+    .map(([label, val]) =>
+      `<div class="status-row"><span class="status-label">${label}</span><span class="status-val">${val}</span></div>`)
     .join("");
 }
 
-/* ─── Utility ─────────────────────────────────────────────────────────────── */
-function toDateInputValue(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+function showAdminToast(msg) {
+  const el = document.getElementById("toast");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add("visible");
+  setTimeout(() => el.classList.remove("visible"), 2500);
 }
 
+function toDateInputValue(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
