@@ -272,3 +272,4 @@ export function getActiveFestival(date) {
     null
   );
 }
+

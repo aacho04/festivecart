@@ -106,3 +106,4 @@ const dashboard = "https://app.flagsmith.com";
 const projectSlug = PROJECT_ID ?? "-";
 console.log(`\n🔗 View in dashboard:`);
 console.log(`   ${dashboard}/project/${projectSlug}/environment/${ENV_KEY}/experiments/${EXPERIMENT_ID}\n`);
+

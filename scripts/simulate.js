@@ -154,3 +154,4 @@ if (EXPERIMENT_ID && ENV_API_KEY) {
   console.log("🔗 Experiment dashboard:");
   console.log(`   https://app.flagsmith.com/project/-/environment/${ENV_API_KEY}/experiments/${EXPERIMENT_ID}\n`);
 }
+

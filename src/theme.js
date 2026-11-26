@@ -55,7 +55,6 @@ export function applyFestivalTheme(festival) {
   if (banner) {
     banner.textContent = festival.bannerMessage;
     banner.hidden = false;
-    banner.classList.add("active");
   }
 
   // Hero
@@ -87,7 +86,6 @@ export function applyNormalTheme() {
   if (banner) {
     banner.textContent = "";
     banner.hidden = true;
-    banner.classList.remove("active");
   }
 
   setText("hero-headline", NORMAL_HERO.headline);
@@ -118,3 +116,4 @@ export function updateProductBadges(festival) {
     }
   });
 }
+

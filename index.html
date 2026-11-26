@@ -3,144 +3,271 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="FestiveCart – Shop that celebrates every festival with you." />
-    <title>FestiveCart 🛒</title>
+    <meta name="description" content="FestiveCart – India's favourite festive shopping destination." />
+    <title>FestiveCart – Shop the Festival</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>" />
     <link rel="stylesheet" href="/src/style.css" />
+    <link rel="preconnect" href="https://images.unsplash.com" />
   </head>
   <body>
-    <!-- Decoration layer (populated by theme engine) -->
+
+    <!-- Decoration layer (populated by theme engine, pointer-events:none) -->
     <div id="decoration-layer" aria-hidden="true"></div>
 
-    <!-- ===== HEADER ===== -->
+    <!-- ══════════════ TOP BAR ══════════════ -->
+    <div class="topbar">
+      <div class="container topbar-inner">
+        <span class="topbar-left">🇮🇳 India's favourite festive shop &nbsp;|&nbsp; Free delivery on orders above <strong>₹499</strong></span>
+        <div class="topbar-right">
+          <a href="#" class="topbar-link">Help</a>
+          <span class="topbar-sep">|</span>
+          <a href="#" class="topbar-link">Sell on FestiveCart</a>
+          <span class="topbar-sep">|</span>
+          <a href="#" class="topbar-link">Download App</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ HEADER ══════════════ -->
     <header class="site-header" id="site-header">
-      <div class="header-inner container">
+      <div class="container header-inner">
+
+        <!-- Logo -->
         <a href="/" class="logo" aria-label="FestiveCart home">
           <span class="logo-icon">🛒</span>
-          <span class="logo-text">FestiveCart</span>
+          <div class="logo-text-wrap">
+            <span class="logo-text">FestiveCart</span>
+            <span class="logo-sub">Shop the Festival</span>
+          </div>
         </a>
 
-        <!-- Festival banner (hidden when no festival) -->
-        <div class="festival-banner" id="festival-banner" role="status" aria-live="polite"></div>
+        <!-- Search -->
+        <div class="search-wrap">
+          <div class="search-box" role="search">
+            <select class="search-category" aria-label="Search category">
+              <option>All</option>
+              <option>Electronics</option>
+              <option>Fashion</option>
+              <option>Grocery</option>
+              <option>Gifts</option>
+            </select>
+            <input
+              type="search"
+              class="search-input"
+              placeholder="Search for products, brands and more"
+              aria-label="Search products"
+            />
+            <button class="search-btn" aria-label="Search">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            </button>
+          </div>
+        </div>
 
+        <!-- Header actions -->
         <div class="header-actions">
-          <button class="cart-btn" id="cart-btn" aria-label="Cart (0 items)">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-            </svg>
-            <span class="cart-count" id="cart-count">0</span>
+          <!-- Wishlist -->
+          <button class="hdr-btn" aria-label="Wishlist">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <span class="hdr-btn-label">Wishlist</span>
+          </button>
+
+          <!-- Cart -->
+          <button class="hdr-btn cart-btn" id="cart-btn" aria-label="Cart (0 items)">
+            <div class="cart-icon-wrap">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+              <span class="cart-count" id="cart-count" aria-hidden="true">0</span>
+            </div>
+            <span class="hdr-btn-label">Cart</span>
           </button>
         </div>
       </div>
 
-      <!-- Light string decoration (Christmas) -->
+      <!-- Light string decoration slot (Christmas) -->
       <div class="light-string" id="light-string" aria-hidden="true"></div>
+
+      <!-- Festival banner -->
+      <div class="festival-banner-bar" id="festival-banner" role="status" aria-live="polite" hidden></div>
     </header>
 
-    <!-- ===== HERO ===== -->
+    <!-- ══════════════ NAV ══════════════ -->
+    <nav class="category-nav" aria-label="Product categories">
+      <div class="container">
+        <ul class="cat-nav-list" id="cat-nav-list" role="list">
+          <!-- Populated by JS -->
+        </ul>
+      </div>
+    </nav>
+
+    <!-- ══════════════ HERO / BANNER ══════════════ -->
     <section class="hero" id="hero">
-      <div class="container hero-inner">
-        <h1 class="hero-headline" id="hero-headline">Everything you need, delivered with joy.</h1>
-        <p class="hero-sub" id="hero-sub">Free delivery on orders above ₹499. Shop thousands of products.</p>
-        <div class="hero-cta">
-          <button class="btn btn-primary btn-hero" id="shop-now-btn">Shop Now</button>
-          <span class="offer-badge" id="offer-badge" hidden></span>
+      <div class="hero-slider">
+        <div class="hero-slide active" id="hero-slide">
+          <div class="hero-content">
+            <div class="hero-tag" id="hero-tag">🎉 Festival Sale</div>
+            <h1 class="hero-headline" id="hero-headline">Everything you need, delivered with joy.</h1>
+            <p class="hero-sub" id="hero-sub">Free delivery on orders above ₹499 · 10-day easy returns</p>
+            <div class="hero-actions">
+              <button class="btn btn-hero-primary" id="shop-now-btn">Shop Now</button>
+              <span class="offer-badge" id="offer-badge" hidden></span>
+            </div>
+          </div>
+          <div class="hero-visual" id="hero-visual" aria-hidden="true">
+            <!-- Festival decorative element rendered by JS -->
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- ===== PRODUCTS ===== -->
-    <main class="main container" id="main">
-      <h2 class="section-title">Featured Products</h2>
-      <div class="product-grid" id="product-grid" role="list">
-        <!-- Products rendered by JS -->
+    <!-- ══════════════ CATEGORY CARDS ══════════════ -->
+    <section class="cat-cards-section container">
+      <div class="cat-cards-grid" id="cat-cards-grid">
+        <!-- Populated by JS -->
       </div>
+    </section>
+
+    <!-- ══════════════ DEAL OF THE DAY ══════════════ -->
+    <section class="deal-section container">
+      <div class="section-header">
+        <h2 class="section-title">🔥 Deal of the Day</h2>
+        <div class="deal-timer" id="deal-timer" aria-label="Deal timer">
+          Ends in: <span id="timer-h">05</span>:<span id="timer-m">00</span>:<span id="timer-s">00</span>
+        </div>
+        <a href="#products" class="view-all-link">View all deals →</a>
+      </div>
+    </section>
+
+    <!-- ══════════════ PRODUCTS ══════════════ -->
+    <main class="main container" id="main">
+      <div class="section-header">
+        <h2 class="section-title" id="products">Featured Products</h2>
+        <div class="sort-row">
+          <span class="sort-label">Sort by:</span>
+          <button class="sort-chip active">Popularity</button>
+          <button class="sort-chip">Price: Low–High</button>
+          <button class="sort-chip">New Arrivals</button>
+        </div>
+      </div>
+      <div class="product-grid" id="product-grid" role="list"></div>
     </main>
 
-    <!-- ===== FOOTER ===== -->
+    <!-- ══════════════ TRUST BADGES ══════════════ -->
+    <section class="trust-section container">
+      <div class="trust-grid">
+        <div class="trust-item"><span class="trust-icon">🚚</span><strong>Free Delivery</strong><span>On orders above ₹499</span></div>
+        <div class="trust-item"><span class="trust-icon">↩️</span><strong>Easy Returns</strong><span>10-day hassle-free return</span></div>
+        <div class="trust-item"><span class="trust-icon">🔒</span><strong>Secure Payments</strong><span>100% safe &amp; encrypted</span></div>
+        <div class="trust-item"><span class="trust-icon">⭐</span><strong>Top Brands</strong><span>Genuine products only</span></div>
+      </div>
+    </section>
+
+    <!-- ══════════════ FOOTER ══════════════ -->
     <footer class="site-footer">
-      <div class="container footer-inner">
-        <p class="footer-logo">🛒 FestiveCart</p>
-        <p class="footer-tagline">Celebrating every festival with you.</p>
-        <div class="footer-links">
-          <a href="#">About</a>
-          <a href="#">Contact</a>
-          <a href="#">Privacy</a>
-          <a href="#">Terms</a>
+      <div class="footer-top container">
+        <div class="footer-col">
+          <div class="footer-logo">🛒 FestiveCart</div>
+          <p class="footer-desc">India's favourite online shop that celebrates every festival with you. Thousands of products, lightning-fast delivery.</p>
+          <div class="footer-social">
+            <a href="#" aria-label="Facebook" class="social-btn">📘</a>
+            <a href="#" aria-label="Instagram" class="social-btn">📸</a>
+            <a href="#" aria-label="Twitter" class="social-btn">🐦</a>
+            <a href="#" aria-label="YouTube" class="social-btn">▶️</a>
+          </div>
         </div>
-        <p class="footer-copy">© 2026 FestiveCart. All prices in Indian Rupees (₹).</p>
-        <p class="footer-experiment" id="footer-experiment" style="font-size:0.75rem;opacity:0.6;margin-top:0.5rem;"></p>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <ul><li><a href="#">About Us</a></li><li><a href="#">Careers</a></li><li><a href="#">Press</a></li><li><a href="#">Blog</a></li></ul>
+        </div>
+        <div class="footer-col">
+          <h4>Help</h4>
+          <ul><li><a href="#">Track Order</a></li><li><a href="#">Returns</a></li><li><a href="#">Shipping Info</a></li><li><a href="#">Contact Us</a></li></ul>
+        </div>
+        <div class="footer-col">
+          <h4>Categories</h4>
+          <ul><li><a href="#">Electronics</a></li><li><a href="#">Fashion</a></li><li><a href="#">Grocery</a></li><li><a href="#">Gifts</a></li></ul>
+        </div>
+        <div class="footer-col">
+          <h4>Payment Methods</h4>
+          <div class="payment-icons">
+            <span class="pay-icon">💳 Visa</span>
+            <span class="pay-icon">💳 Mastercard</span>
+            <span class="pay-icon">📱 UPI</span>
+            <span class="pay-icon">🏦 Netbanking</span>
+            <span class="pay-icon">💵 COD</span>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom container">
+        <p>© 2026 FestiveCart Pvt. Ltd. All rights reserved. CIN: U74999MH2026PTC123456</p>
+        <div class="footer-legal">
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms of Use</a>
+          <a href="#">Sitemap</a>
+        </div>
+        <p class="footer-experiment" id="footer-experiment"></p>
       </div>
     </footer>
 
-    <!-- ===== ADMIN PANEL ===== -->
+    <!-- ══════════════ ADMIN PANEL ══════════════ -->
     <div id="admin-panel-wrapper">
-      <!-- Toggle button -->
-      <button
-        class="admin-toggle-btn"
-        id="admin-toggle-btn"
+      <button class="admin-toggle-btn" id="admin-toggle-btn"
         aria-label="Toggle admin panel (Shift+A)"
-        aria-expanded="false"
-        aria-controls="admin-panel"
-        title="Admin / Demo Panel (Shift+A)"
-      >⚙️</button>
+        aria-expanded="false" aria-controls="admin-panel"
+        title="Admin / Demo Panel (Shift+A)">⚙️</button>
 
-      <!-- Panel -->
-      <aside
-        class="admin-panel"
-        id="admin-panel"
-        aria-label="Admin demo panel"
-        hidden
-      >
+      <aside class="admin-panel" id="admin-panel" aria-label="Admin demo panel" hidden>
         <div class="admin-panel-header">
           <span class="admin-badge">🛠 Admin / Demo Tool</span>
           <button class="admin-close-btn" id="admin-close-btn" aria-label="Close admin panel">✕</button>
         </div>
-
-        <!-- Festive mode switch -->
         <div class="admin-row">
           <label class="admin-label" for="festive-toggle">Festive Mode</label>
           <div class="toggle-group">
-            <button
-              class="toggle-switch"
-              id="festive-toggle"
-              role="switch"
-              aria-checked="true"
-              aria-label="Festive mode on/off"
-            >
+            <button class="toggle-switch" id="festive-toggle" role="switch" aria-checked="true" aria-label="Festive mode on/off">
               <span class="toggle-thumb"></span>
             </button>
             <span class="override-label" id="override-label" hidden>Local override</span>
           </div>
         </div>
         <button class="btn btn-sm btn-ghost" id="use-flagsmith-btn" hidden>↩ Use Flagsmith value</button>
-
-        <!-- Festival selector -->
         <div class="admin-row">
           <label class="admin-label" for="festival-select">Simulate festival</label>
           <select class="admin-select" id="festival-select">
             <option value="">— Real date —</option>
-            <!-- Populated by JS -->
           </select>
         </div>
-
-        <!-- Date picker -->
         <div class="admin-row">
           <label class="admin-label" for="date-picker">Simulate date</label>
           <input class="admin-input" type="date" id="date-picker" />
         </div>
-
         <button class="btn btn-sm btn-ghost" id="reset-date-btn">📅 Reset to today</button>
-
-        <!-- Status -->
-        <div class="admin-status" id="admin-status" aria-live="polite">
-          <!-- Populated by JS -->
-        </div>
+        <div class="admin-status" id="admin-status" aria-live="polite"></div>
       </aside>
     </div>
 
-    <!-- Cart notification toast -->
+    <!-- Cart sidebar -->
+    <div class="cart-overlay" id="cart-overlay" hidden aria-modal="true" role="dialog" aria-label="Shopping cart">
+      <div class="cart-panel">
+        <div class="cart-header">
+          <h3>My Cart <span id="cart-panel-count">(0 items)</span></h3>
+          <button class="cart-close-btn" id="cart-close-btn" aria-label="Close cart">✕</button>
+        </div>
+        <div class="cart-items" id="cart-items">
+          <div class="cart-empty">
+            <span class="cart-empty-icon">🛒</span>
+            <p>Your cart is empty</p>
+            <p class="cart-empty-sub">Add items to get started</p>
+          </div>
+        </div>
+        <div class="cart-footer" id="cart-footer" hidden>
+          <div class="cart-total-row"><span>Subtotal</span><span id="cart-subtotal">₹0</span></div>
+          <div class="cart-total-row cart-total-row--delivery"><span>Delivery</span><span class="cart-free">FREE</span></div>
+          <div class="cart-total-row cart-grand"><span>Total</span><span id="cart-grand">₹0</span></div>
+          <button class="btn btn-primary btn-checkout">Proceed to Checkout →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
     <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
     <script type="module" src="/src/main.js"></script>

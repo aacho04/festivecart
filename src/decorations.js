@@ -431,3 +431,4 @@ export function renderDecorations(decorationType) {
     layer.classList.add("reduced-motion");
   }
 }
+
